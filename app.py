@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 from PIL.ExifTags import TAGS, GPSTAGS
 import sqlite3
 import os
@@ -154,7 +154,8 @@ def get_decimal_from_dms(dms, ref):
 
 def extract_exif_data(image_path):
     try:
-        image = Image.open(image_path)
+        # Bổ sung giữ nguyên chiều ảnh
+        image = ImageOps.exif_transpose(Image.open(image_path))
     except: return "Không rõ", "Không rõ"
     
     exif_time = "Không có dữ liệu thời gian"
@@ -191,7 +192,8 @@ def extract_exif_data(image_path):
     return exif_time, location_text
 
 def make_aspect_ratio_image(image_path, target_ratio):
-    image = Image.open(image_path)
+    # Bổ sung giữ nguyên chiều ảnh
+    image = ImageOps.exif_transpose(Image.open(image_path))
     w, h = image.size
     if target_ratio == "4:5":
         target_w, target_h = 1080, 1350
@@ -333,7 +335,10 @@ if st.session_state.pending_post:
                         genai.configure(api_key=current_api_key)
                         model = genai.GenerativeModel('gemini-3.6-flash')
                         final_prompt = f"Thông tin phụ: Ảnh chụp lúc {p['exif_time']}, tại {p['loc_text']}.\n\n{active_prompt}"
-                        response = model.generate_content([final_prompt, Image.open(p["img_path"])])
+                        
+                        # Bổ sung giữ nguyên chiều ảnh gửi tới AI
+                        correct_img = ImageOps.exif_transpose(Image.open(p["img_path"]))
+                        response = model.generate_content([final_prompt, correct_img])
                         
                         res_text = response.text.split("---")
                         c_kids, c_mkt = "", ""
@@ -386,7 +391,10 @@ elif st.session_state.active_post_id:
                             genai.configure(api_key=current_api_key)
                             model = genai.GenerativeModel('gemini-1.5-flash')
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---KIDSLAND--- trong Master Prompt:\n{active_prompt}"
-                            res = model.generate_content([re_prompt, Image.open(p_img)])
+                            
+                            # Bổ sung giữ nguyên chiều ảnh gửi tới AI
+                            correct_img = ImageOps.exif_transpose(Image.open(p_img))
+                            res = model.generate_content([re_prompt, correct_img])
                             
                             clean_text = res.text.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             
@@ -406,7 +414,10 @@ elif st.session_state.active_post_id:
                             genai.configure(api_key=current_api_key)
                             model = genai.GenerativeModel('gemini-1.5-flash')
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---MARKETING--- trong Master Prompt:\n{active_prompt}"
-                            res = model.generate_content([re_prompt, Image.open(p_img)])
+                            
+                            # Bổ sung giữ nguyên chiều ảnh gửi tới AI
+                            correct_img = ImageOps.exif_transpose(Image.open(p_img))
+                            res = model.generate_content([re_prompt, correct_img])
                             
                             clean_text = res.text.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             

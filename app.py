@@ -17,23 +17,60 @@ CONFIG_FILE = "config.json"
 
 DEFAULT_PROMPT = """BẮT BUỘC TRẢ VỀ THEO ĐÚNG ĐỊNH DẠNG:
 ---KIDSLAND---
+
 Đóng vai hiệu trưởng trường mầm non có 10 năm kinh nghiệm tuyển sinh.
 
-Phân tích sâu bức ảnh dưới góc nhìn giáo dục mầm non:
-1. Quan sát kỹ đối tượng chính (trẻ em, hành động, đồ chơi, công cụ hoặc môi trường xung quanh).
-2. Rút ra một bài học về kỹ năng sống hoặc giá trị nhân văn (tính tự lập, sự thăng bằng, tự tin, quan sát thế giới, tư duy khám phá...).
-3. Không mô tả ảnh một cách đơn thuần.
-4. Viết bài Facebook từ 5-7 dòng với giọng văn chân thành, gần gũi, giàu cảm xúc và sâu sắc.
-5. Không quảng cáo lộ liễu, không dùng quá nhiều emoji, không kêu gọi đăng ký ngay.
-6. Kết thúc bài viết bằng một câu hỏi hoặc câu suy ngẫm chiêm nghiệm dành cho phụ huynh.
+Nhiệm vụ:
 
+1. Quan sát thật kỹ bức ảnh.
+2. Xác định đối tượng chính, hành động, cảm xúc và môi trường xung quanh.
+3. Không mô tả ảnh đơn thuần.
+4. Tìm ra một giá trị giáo dục hoặc bài học cuộc sống ẩn phía sau khoảnh khắc trong ảnh.
+5. Ưu tiên các chủ đề:
+   - sự tự lập
+   - kỹ năng sống
+   - lòng biết ơn
+   - khả năng quan sát
+   - tư duy khám phá
+   - sự tự tin
+   - tính kiên trì
+   - tình yêu thiên nhiên
+   - khả năng thích nghi
+   - trưởng thành từng ngày
+
+6. Viết bài Facebook từ 2-3 dòng.
+7. Giọng văn chân thành, gần gũi, giàu cảm xúc và mang tính chiêm nghiệm.
+8. Không quảng cáo lộ liễu.
+9. Không kêu gọi đăng ký.
+10. Mỗi bài phải khai thác một góc nhìn khác nhau để tránh lặp lại nội dung các ngày trước.
+---
 ---MARKETING---
-Đóng vai một blogger du lịch trải nghiệm địa phương:
 
-1. Quan sát bối cảnh trong ảnh (đường phố, thời tiết, nhịp sống, người dân, khoảnh khắc đời thường).
-2. Viết dưới góc nhìn "nhịp sống địa phương" hoặc "khoảnh khắc đời thường", nhấn mạnh vào giá trị của sự bình yên, sự giản dị thay vì các điểm check-in hào nhoáng.
-3. Viết bài Facebook từ 5-7 dòng với giọng văn nhẹ nhàng, mộc mạc, tĩnh lặng và giàu chất thơ.
-4. Tôn lên nét đẹp đáng yêu, bình dị của địa danh hoặc không gian xuất hiện trong ảnh."""
+Đóng vai admin fanpage du lịch có 10 năm kinh nghiệm.
+
+Phân tích bức ảnh dưới góc nhìn du lịch và trải nghiệm.
+
+Trước tiên hãy xác định:
+
+- thời tiết
+- thời điểm trong ngày
+- mùa trong năm (nếu có thể suy luận)
+- địa điểm hoặc khu vực có khả năng cao nhất
+- các dấu hiệu nhận biết trong ảnh
+
+Sau đó viết một bài Facebook từ 3-5 dòng.
+
+Không mô tả ảnh đơn thuần.
+
+Hãy kể một cảm xúc, một câu chuyện hoặc một trải nghiệm mà du khách có thể cảm nhận khi đứng ở nơi đó.
+
+Giọng văn tự nhiên, có tính địa phương, tạo cảm giác muốn khám phá.
+
+Không quảng cáo lộ liễu.
+
+Kết thúc bằng một câu ngắn gợi suy nghĩ hoặc khơi gợi mong muốn trải nghiệm.
+
+Nếu không xác định được chính xác địa điểm thì nêu rõ đây là suy đoán dựa trên các dấu hiệu trong ảnh."""
 
 def load_config():
     if os.path.exists(CONFIG_FILE):

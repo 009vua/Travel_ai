@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+import openai
 from PIL import Image, ImageFilter, ImageOps
 from PIL.ExifTags import TAGS, GPSTAGS
 import sqlite3
@@ -9,6 +10,8 @@ import requests
 import hashlib
 import shutil
 import json
+import base64
+import io
 
 # ==========================================
 # 1. QUẢN LÝ CẤU HÌNH (CONFIG.JSON)
@@ -81,6 +84,7 @@ def load_config():
             pass
     return {
         "api_key": "",
+        "openai_api_key": "",
         "custom_prompt": DEFAULT_PROMPT
     }
 
@@ -121,26 +125,76 @@ def init_db():
 
 init_db()
 
-# Cài đặt Sidebar (Lưu API Key)
-with st.sidebar.expander("⚙️ Cài đặt API Key", expanded=True):
+# Cài đặt Sidebar (Lưu API Keys)
+with st.sidebar.expander("⚙️ Cài đặt API Keys", expanded=True):
     api_key_input = st.text_input(
         "Nhập Gemini API Key:", 
         value=config.get("api_key", ""), 
-        type="password",
-        help="API Key sẽ được lưu lại trên máy này cho các lần sử dụng sau."
+        type="password"
     )
-    if st.button("💾 Lưu API Key", type="primary", use_container_width=True):
+    openai_key_input = st.text_input(
+        "Nhập ChatGPT (OpenAI) API Key:", 
+        value=config.get("openai_api_key", ""), 
+        type="password"
+    )
+    if st.button("💾 Lưu API Keys", type="primary", use_container_width=True):
         config["api_key"] = api_key_input
+        config["openai_api_key"] = openai_key_input
         save_config(config)
-        st.toast("✅ Đã lưu API Key thành công!", icon="💾")
-    st.markdown("[👉 Lấy API Key miễn phí tại đây](https://aistudio.google.com/app/apikey)")
+        st.toast("✅ Đã lưu cấu hình API Keys thành công!", icon="💾")
+    st.markdown("[👉 Lấy Gemini Key](https://aistudio.google.com/app/apikey) | [👉 Lấy OpenAI Key](https://platform.openai.com/api-keys)")
 
 st.title("📘 Facebook AI Content Studio")
-st.caption("Quản lý nội dung 30 ngày - Không lưu trùng ảnh - Viết bài chuyên sâu")
+st.caption("Tích hợp Google Gemini & ChatGPT - Sửa lỗi xoay ảnh - Quản lý 30 ngày")
+
+current_api_key = config.get("api_key", "")
+current_openai_key = config.get("openai_api_key", "")
 
 # ==========================================
-# 3. CÁC HÀM XỬ LÝ ẢNH & GPS
+# 3. CÁC HÀM XỬ LÝ ẢNH & GỌI AI
 # ==========================================
+def encode_image_to_base64(image_path):
+    img = ImageOps.exif_transpose(Image.open(image_path))
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG")
+    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+def analyze_image_with_ai(ai_provider, prompt_text, image_path, gemini_key, openai_key):
+    if ai_provider == "Google Gemini":
+        if not gemini_key:
+            raise Exception("Vui lòng nhập và lưu Gemini API Key ở thanh bên trái!")
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        correct_img = ImageOps.exif_transpose(Image.open(image_path))
+        response = model.generate_content([prompt_text, correct_img])
+        return response.text
+    elif ai_provider == "ChatGPT (OpenAI)":
+        if not openai_key:
+            raise Exception("Vui lòng nhập và lưu ChatGPT (OpenAI) API Key ở thanh bên trái!")
+        base64_img = encode_image_to_base64(image_path)
+        client = openai.OpenAI(api_key=openai_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt_text},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=1000
+        )
+        return response.choices[0].message.content
+    else:
+        raise Exception("Mô hình AI không hợp lệ.")
+
 def get_decimal_from_dms(dms, ref):
     try:
         degrees = dms[0]
@@ -154,7 +208,6 @@ def get_decimal_from_dms(dms, ref):
 
 def extract_exif_data(image_path):
     try:
-        # Bổ sung giữ nguyên chiều ảnh
         image = ImageOps.exif_transpose(Image.open(image_path))
     except: return "Không rõ", "Không rõ"
     
@@ -192,7 +245,6 @@ def extract_exif_data(image_path):
     return exif_time, location_text
 
 def make_aspect_ratio_image(image_path, target_ratio):
-    # Bổ sung giữ nguyên chiều ảnh
     image = ImageOps.exif_transpose(Image.open(image_path))
     w, h = image.size
     if target_ratio == "4:5":
@@ -249,7 +301,7 @@ def delete_post(post_id, image_path):
     st.rerun()
 
 # ==========================================
-# 5. KHU VỰC TÙY CHỈNH PROMPT (CÓ LƯU BỀN VỮNG)
+# 5. KHU VỰC TÙY CHỈNH PROMPT
 # ==========================================
 with st.expander("📝 Tùy chỉnh Master Prompt", expanded=False):
     custom_prompt_input = st.text_area(
@@ -269,9 +321,7 @@ with st.expander("📝 Tùy chỉnh Master Prompt", expanded=False):
             save_config(config)
             st.rerun()
 
-# Lấy prompt hiện tại để gửi cho AI
 active_prompt = custom_prompt_input
-current_api_key = config.get("api_key", "")
 
 # ==========================================
 # 6. KHU VỰC THAO TÁC TẢI ẢNH (TOP)
@@ -326,41 +376,38 @@ if st.session_state.pending_post:
         
     with col_content:
         st.warning("⚠️ Ảnh này chưa được phân tích và chưa lưu vào thư viện.")
+        
+        # Chọn công cụ AI
+        selected_ai = st.radio("🤖 Chọn mô hình AI phân tích:", ["Google Gemini", "ChatGPT (OpenAI)"], horizontal=True)
+        
         if st.button("🚀 Bấm để AI phân tích ảnh này", type="primary", use_container_width=True):
-            if not current_api_key:
-                st.error("⚠️ Vui lòng nhập và bấm 'Lưu API Key' ở cột bên trái trước!")
-            else:
-                with st.spinner("AI đang giải mã bức ảnh và sáng tạo nội dung..."):
-                    try:
-                        genai.configure(api_key=current_api_key)
-                        model = genai.GenerativeModel('gemini-3.6-flash')
-                        final_prompt = f"Thông tin phụ: Ảnh chụp lúc {p['exif_time']}, tại {p['loc_text']}.\n\n{active_prompt}"
-                        
-                        # Bổ sung giữ nguyên chiều ảnh gửi tới AI
-                        correct_img = ImageOps.exif_transpose(Image.open(p["img_path"]))
-                        response = model.generate_content([final_prompt, correct_img])
-                        
-                        res_text = response.text.split("---")
-                        c_kids, c_mkt = "", ""
-                        for i in range(len(res_text)):
-                            if "KIDSLAND" in res_text[i]: c_kids = res_text[i+1].strip()
-                            elif "MARKETING" in res_text[i]: c_mkt = res_text[i+1].strip()
-                        
-                        final_img_path = os.path.join(UPLOAD_DIR, f"{p['id']}.{p['ext']}")
+            with st.spinner(f"Đang phân tích bằng {selected_ai}..."):
+                try:
+                    final_prompt = f"Thông tin phụ: Ảnh chụp lúc {p['exif_time']}, tại {p['loc_text']}.\n\n{active_prompt}"
+                    raw_res = analyze_image_with_ai(selected_ai, final_prompt, p["img_path"], current_api_key, current_openai_key)
+                    
+                    res_text = raw_res.split("---")
+                    c_kids, c_mkt = "", ""
+                    for i in range(len(res_text)):
+                        if "KIDSLAND" in res_text[i]: c_kids = res_text[i+1].strip()
+                        elif "MARKETING" in res_text[i]: c_mkt = res_text[i+1].strip()
+                    
+                    final_img_path = os.path.join(UPLOAD_DIR, f"{p['id']}.{p['ext']}")
+                    if os.path.exists(p["img_path"]):
                         shutil.move(p["img_path"], final_img_path)
-                        
-                        conn = sqlite3.connect("travel_ai.db")
-                        conn.execute("INSERT OR IGNORE INTO posts VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                                     (p["id"], final_img_path, p["exif_time"], p["loc_text"], 
-                                      c_kids, c_mkt, datetime.datetime.now()))
-                        conn.commit()
-                        conn.close()
-                        
-                        st.session_state.active_post_id = p["id"]
-                        st.session_state.pending_post = None
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Lỗi khi gọi AI: {e}")
+                    
+                    conn = sqlite3.connect("travel_ai.db")
+                    conn.execute("INSERT OR IGNORE INTO posts VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                                 (p["id"], final_img_path, p["exif_time"], p["loc_text"], 
+                                  c_kids, c_mkt, datetime.datetime.now()))
+                    conn.commit()
+                    conn.close()
+                    
+                    st.session_state.active_post_id = p["id"]
+                    st.session_state.pending_post = None
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Lỗi: {e}")
 
 # --- Hiển thị 2: Xem ảnh đã lưu trong thư viện (Active) ---
 elif st.session_state.active_post_id:
@@ -383,49 +430,39 @@ elif st.session_state.active_post_id:
             
             with tab1:
                 st.text_area("Nội dung Kidsland:", value=p_kids, height=250, key=f"kids_{p_id}")
+                ai_re_kids = st.radio("Mô hình AI viết lại:", ["Google Gemini", "ChatGPT (OpenAI)"], key=f"radio_k_{p_id}", horizontal=True)
                 if st.button("🔄 Viết lại bài Kidsland", key=f"re_kids_{p_id}"):
-                    if not current_api_key:
-                        st.error("⚠️ Vui lòng nhập API Key!")
-                    else:
-                        with st.spinner("Đang viết lại Kidsland..."):
-                            genai.configure(api_key=current_api_key)
-                            model = genai.GenerativeModel('gemini-1.5-flash')
+                    with st.spinner(f"Đang viết lại bằng {ai_re_kids}..."):
+                        try:
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---KIDSLAND--- trong Master Prompt:\n{active_prompt}"
-                            
-                            # Bổ sung giữ nguyên chiều ảnh gửi tới AI
-                            correct_img = ImageOps.exif_transpose(Image.open(p_img))
-                            res = model.generate_content([re_prompt, correct_img])
-                            
-                            clean_text = res.text.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
+                            raw_res = analyze_image_with_ai(ai_re_kids, re_prompt, p_img, current_api_key, current_openai_key)
+                            clean_text = raw_res.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             
                             conn = sqlite3.connect("travel_ai.db")
                             conn.execute("UPDATE posts SET content_kidsland=? WHERE id=?", (clean_text, p_id))
                             conn.commit()
                             conn.close()
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Lỗi: {e}")
 
             with tab2:
                 st.text_area("Nội dung Marketing:", value=p_mkt, height=250, key=f"mkt_{p_id}")
+                ai_re_mkt = st.radio("Mô hình AI viết lại:", ["Google Gemini", "ChatGPT (OpenAI)"], key=f"radio_m_{p_id}", horizontal=True)
                 if st.button("🔄 Viết lại bài Marketing", key=f"re_mkt_{p_id}"):
-                    if not current_api_key:
-                        st.error("⚠️ Vui lòng nhập API Key!")
-                    else:
-                        with st.spinner("Đang viết lại Marketing..."):
-                            genai.configure(api_key=current_api_key)
-                            model = genai.GenerativeModel('gemini-1.5-flash')
+                    with st.spinner(f"Đang viết lại bằng {ai_re_mkt}..."):
+                        try:
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---MARKETING--- trong Master Prompt:\n{active_prompt}"
-                            
-                            # Bổ sung giữ nguyên chiều ảnh gửi tới AI
-                            correct_img = ImageOps.exif_transpose(Image.open(p_img))
-                            res = model.generate_content([re_prompt, correct_img])
-                            
-                            clean_text = res.text.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
+                            raw_res = analyze_image_with_ai(ai_re_mkt, re_prompt, p_img, current_api_key, current_openai_key)
+                            clean_text = raw_res.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             
                             conn = sqlite3.connect("travel_ai.db")
                             conn.execute("UPDATE posts SET content_marketing=? WHERE id=?", (clean_text, p_id))
                             conn.commit()
                             conn.close()
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Lỗi: {e}")
 
 # ==========================================
 # 7. KHU VỰC THƯ VIỆN ẢNH (BOTTOM)

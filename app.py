@@ -294,7 +294,7 @@ if st.session_state.pending_post:
                 with st.spinner("AI đang giải mã bức ảnh và sáng tạo nội dung..."):
                     try:
                         genai.configure(api_key=current_api_key)
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-3.6-flash')
                         final_prompt = f"Thông tin phụ: Ảnh chụp lúc {p['exif_time']}, tại {p['loc_text']}.\n\n{active_prompt}"
                         response = model.generate_content([final_prompt, Image.open(p["img_path"])])
                         

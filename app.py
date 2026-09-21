@@ -166,7 +166,7 @@ def analyze_image_with_ai(ai_provider, prompt_text, image_path, gemini_key, open
         if not gemini_key:
             raise Exception("Vui lòng nhập và lưu Gemini API Key ở thanh bên trái!")
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3.6-flash')
         correct_img = ImageOps.exif_transpose(Image.open(image_path))
         response = model.generate_content([prompt_text, correct_img])
         return response.text

@@ -49,31 +49,22 @@ Nhiệm vụ:
 ---
 ---MARKETING---
 
-Đóng vai admin fanpage du lịch có 10 năm kinh nghiệm.
+**Vai trò:** Bạn là admin Fanpage du lịch có 10 năm kinh nghiệm, sở hữu phong cách viết súc tích, tinh tế và đầy cảm xúc.
 
-Phân tích bức ảnh dưới góc nhìn du lịch và trải nghiệm.
+**Nhiệm vụ:**
+1. Trích xuất thông tin thực tế từ bức ảnh (sử dụng cả dữ liệu hình ảnh và Exif/GPS metadata nếu có):
+   - Thời gian chính xác (giờ, ngày/tháng/mùa).
+   - Tọa độ / Vị trí / Địa danh (Thành phố, khu vực).
+   - Bối cảnh (thời tiết, ánh sáng, chất liệu không gian).
 
-Trước tiên hãy xác định:
+2. Đóng vai du khách trải nghiệm để viết một bài đăng Facebook (độ dài 3-5 câu).
 
-- thời tiết
-- thời điểm trong ngày
-- mùa trong năm (nếu có thể suy luận)
-- địa điểm hoặc khu vực có khả năng cao nhất
-- các dấu hiệu nhận biết trong ảnh
-
-Sau đó viết một bài Facebook từ 3-5 dòng.
-
-Không mô tả ảnh đơn thuần.
-
-Hãy kể một cảm xúc, một câu chuyện hoặc một trải nghiệm mà du khách có thể cảm nhận khi đứng ở nơi đó.
-
-Giọng văn tự nhiên, có tính địa phương, tạo cảm giác muốn khám phá.
-
-Không quảng cáo lộ liễu.
-
-Kết thúc bằng một câu ngắn gợi suy nghĩ hoặc khơi gợi mong muốn trải nghiệm.
-
-Nếu không xác định được chính xác địa điểm thì nêu rõ đây là suy đoán dựa trên các dấu hiệu trong ảnh."""
+**Yêu cầu bài viết:**
+- **Thẻ thông tin (Check-in Stamp):** Mở đầu bài viết bằng 1 dòng định dạng ngắn gọn chứa thông tin GPS/thời gian thực từ ảnh. 
+  *(Mẫu: 📍 [Tên địa danh/Khu vực] | [Giờ chụp], [Mùa/Thời tiết])*
+- **Cách kể chuyện (Storytelling):** Không mô tả ảnh khô khan. Hãy miêu tả cảm giác của các giác quan (mùi hương, âm thanh, vạt nắng, cái lạnh nhẹ...) và một khoảng lặng tâm hồn khi đứng ở góc đó.
+- **Giọng văn:** Tự nhiên, có chất địa phương nhẹ nhàng, mộc mạc, không dùng từ sáo rỗng hay quảng cáo lộ liễu.
+- **Kết bài:** Kết thúc bằng một câu hỏi hoặc câu nhận định ngắn (dưới 15 từ) khơi gợi mong muốn xách balo lên và đi."""
 
 def load_config():
     if os.path.exists(CONFIG_FILE):

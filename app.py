@@ -97,7 +97,7 @@ if not api_key_input:
 
 # Khởi tạo Gemini
 genai.configure(api_key=api_key_input)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-3.6-flash')
 
 uploaded_file = st.file_uploader("Chọn một bức ảnh...", type=["jpg", "jpeg", "png", "heic"])
 

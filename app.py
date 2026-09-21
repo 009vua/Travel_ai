@@ -9,12 +9,15 @@ import datetime
 import requests
 import hashlib
 import shutil
+import json
 import base64
 import io
 
 # ==========================================
-# 1. KHỞI TẠO CẤU HÌNH MẶC ĐỊNH
+# 1. QUẢN LÝ CẤU HÌNH (CONFIG.JSON)
 # ==========================================
+CONFIG_FILE = "config.json"
+
 DEFAULT_PROMPT = """BẮT BUỘC TRẢ VỀ THEO ĐÚNG ĐỊNH DẠNG:
 ---KIDSLAND---
 
@@ -72,17 +75,29 @@ Kết thúc bằng một câu ngắn gợi suy nghĩ hoặc khơi gợi mong mu�
 
 Nếu không xác định được chính xác địa điểm thì nêu rõ đây là suy đoán dựa trên các dấu hiệu trong ảnh."""
 
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "api_key": "",
+        "openai_api_key": "",
+        "custom_prompt": DEFAULT_PROMPT
+    }
+
+def save_config(config_data):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, ensure_ascii=False, indent=4)
+
+config = load_config()
+
 # ==========================================
-# 2. KHỞI TẠO HỆ THỐNG & SESSION STATE
+# 2. KHỞI TẠO HỆ THỐNG & CƠ SỞ DỮ LIỆU
 # ==========================================
 st.set_page_config(page_title="Facebook Content Studio", page_icon="📘", layout="wide")
-
-if 'gemini_key' not in st.session_state:
-    st.session_state.gemini_key = ""
-if 'openai_key' not in st.session_state:
-    st.session_state.openai_key = ""
-if 'custom_prompt' not in st.session_state:
-    st.session_state.custom_prompt = DEFAULT_PROMPT
 
 UPLOAD_DIR = "uploads"
 if not os.path.exists(UPLOAD_DIR):
@@ -110,24 +125,30 @@ def init_db():
 
 init_db()
 
-# Cài đặt Sidebar (Mỗi người dùng tự nhập key riêng tư trên trình duyệt của họ)
+# Cài đặt Sidebar (Lưu API Keys)
 with st.sidebar.expander("⚙️ Cài đặt API Keys", expanded=True):
-    st.session_state.gemini_key = st.text_input(
+    api_key_input = st.text_input(
         "Nhập Gemini API Key:", 
-        value=st.session_state.gemini_key, 
-        type="password",
-        help="Key này chỉ lưu trên trình duyệt của riêng bạn, an toàn tuyệt đối."
+        value=config.get("api_key", ""), 
+        type="password"
     )
-    st.session_state.openai_key = st.text_input(
+    openai_key_input = st.text_input(
         "Nhập ChatGPT (OpenAI) API Key:", 
-        value=st.session_state.openai_key, 
-        type="password",
-        help="Key này chỉ lưu trên trình duyệt của riêng bạn."
+        value=config.get("openai_api_key", ""), 
+        type="password"
     )
+    if st.button("💾 Lưu API Keys", type="primary", use_container_width=True):
+        config["api_key"] = api_key_input
+        config["openai_api_key"] = openai_key_input
+        save_config(config)
+        st.toast("✅ Đã lưu cấu hình API Keys thành công!", icon="💾")
     st.markdown("[👉 Lấy Gemini Key](https://aistudio.google.com/app/apikey) | [👉 Lấy OpenAI Key](https://platform.openai.com/api-keys)")
 
 st.title("📘 Facebook AI Content Studio")
-st.caption("Ứng dụng đa người dùng - Tự do nhập API Key riêng - Xử lý ảnh thông minh")
+st.caption("Tích hợp Google Gemini & ChatGPT - Sửa lỗi xoay ảnh - Quản lý 30 ngày")
+
+current_api_key = config.get("api_key", "")
+current_openai_key = config.get("openai_api_key", "")
 
 # ==========================================
 # 3. CÁC HÀM XỬ LÝ ẢNH & GỌI AI
@@ -140,20 +161,20 @@ def encode_image_to_base64(image_path):
     img.save(buffer, format="JPEG")
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-def analyze_image_with_ai(ai_provider, prompt_text, image_path):
+def analyze_image_with_ai(ai_provider, prompt_text, image_path, gemini_key, openai_key):
     if ai_provider == "Google Gemini":
-        if not st.session_state.gemini_key:
-            raise Exception("Vui lòng nhập Gemini API Key ở thanh bên trái!")
-        genai.configure(api_key=st.session_state.gemini_key)
+        if not gemini_key:
+            raise Exception("Vui lòng nhập và lưu Gemini API Key ở thanh bên trái!")
+        genai.configure(api_key=gemini_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
         correct_img = ImageOps.exif_transpose(Image.open(image_path))
         response = model.generate_content([prompt_text, correct_img])
         return response.text
     elif ai_provider == "ChatGPT (OpenAI)":
-        if not st.session_state.openai_key:
-            raise Exception("Vui lòng nhập ChatGPT (OpenAI) API Key ở thanh bên trái!")
+        if not openai_key:
+            raise Exception("Vui lòng nhập và lưu ChatGPT (OpenAI) API Key ở thanh bên trái!")
         base64_img = encode_image_to_base64(image_path)
-        client = openai.OpenAI(api_key=st.session_state.openai_key)
+        client = openai.OpenAI(api_key=openai_key)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -249,7 +270,7 @@ def make_aspect_ratio_image(image_path, target_ratio):
     return bg
 
 # ==========================================
-# 4. QUẢN LÝ TRẠNG THÁI GIAO DIỆN
+# 4. QUẢN LÝ TRẠNG THÁI (SESSION STATE)
 # ==========================================
 if 'active_post_id' not in st.session_state:
     st.session_state.active_post_id = None
@@ -283,19 +304,27 @@ def delete_post(post_id, image_path):
 # 5. KHU VỰC TÙY CHỈNH PROMPT
 # ==========================================
 with st.expander("📝 Tùy chỉnh Master Prompt", expanded=False):
-    st.session_state.custom_prompt = st.text_area(
+    custom_prompt_input = st.text_area(
         "Nội dung yêu cầu (Prompt) gửi tới AI:",
-        value=st.session_state.custom_prompt,
+        value=config.get("custom_prompt", DEFAULT_PROMPT),
         height=450
     )
-    if st.button("🔄 Khôi phục phôi mặc định"):
-        st.session_state.custom_prompt = DEFAULT_PROMPT
-        st.rerun()
+    col_p1, col_p2 = st.columns([1, 4])
+    with col_p1:
+        if st.button("💾 Lưu Prompt", use_container_width=True):
+            config["custom_prompt"] = custom_prompt_input
+            save_config(config)
+            st.toast("✅ Đã lưu Master Prompt thành công!", icon="💾")
+    with col_p2:
+        if st.button("🔄 Phôi mặc định", help="Khôi phục lại Prompt mẫu chuẩn ban đầu"):
+            config["custom_prompt"] = DEFAULT_PROMPT
+            save_config(config)
+            st.rerun()
 
-active_prompt = st.session_state.custom_prompt
+active_prompt = custom_prompt_input
 
 # ==========================================
-# 6. KHU VỰC TẢI ẢNH (TOP)
+# 6. KHU VỰC THAO TÁC TẢI ẢNH (TOP)
 # ==========================================
 uploaded_file = st.file_uploader("Kéo thả ảnh mới vào đây (Tối đa 3MB)", type=["jpg", "jpeg", "png"])
 
@@ -348,13 +377,14 @@ if st.session_state.pending_post:
     with col_content:
         st.warning("⚠️ Ảnh này chưa được phân tích và chưa lưu vào thư viện.")
         
+        # Chọn công cụ AI
         selected_ai = st.radio("🤖 Chọn mô hình AI phân tích:", ["Google Gemini", "ChatGPT (OpenAI)"], horizontal=True)
         
         if st.button("🚀 Bấm để AI phân tích ảnh này", type="primary", use_container_width=True):
             with st.spinner(f"Đang phân tích bằng {selected_ai}..."):
                 try:
                     final_prompt = f"Thông tin phụ: Ảnh chụp lúc {p['exif_time']}, tại {p['loc_text']}.\n\n{active_prompt}"
-                    raw_res = analyze_image_with_ai(selected_ai, final_prompt, p["img_path"])
+                    raw_res = analyze_image_with_ai(selected_ai, final_prompt, p["img_path"], current_api_key, current_openai_key)
                     
                     res_text = raw_res.split("---")
                     c_kids, c_mkt = "", ""
@@ -405,7 +435,7 @@ elif st.session_state.active_post_id:
                     with st.spinner(f"Đang viết lại bằng {ai_re_kids}..."):
                         try:
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---KIDSLAND--- trong Master Prompt:\n{active_prompt}"
-                            raw_res = analyze_image_with_ai(ai_re_kids, re_prompt, p_img)
+                            raw_res = analyze_image_with_ai(ai_re_kids, re_prompt, p_img, current_api_key, current_openai_key)
                             clean_text = raw_res.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             
                             conn = sqlite3.connect("travel_ai.db")
@@ -423,7 +453,7 @@ elif st.session_state.active_post_id:
                     with st.spinner(f"Đang viết lại bằng {ai_re_mkt}..."):
                         try:
                             re_prompt = f"Thông tin: Ảnh chụp {p_time} tại {p_loc}.\n\nYêu cầu: Viết lại theo đúng quy tắc phần ---MARKETING--- trong Master Prompt:\n{active_prompt}"
-                            raw_res = analyze_image_with_ai(ai_re_mkt, re_prompt, p_img)
+                            raw_res = analyze_image_with_ai(ai_re_mkt, re_prompt, p_img, current_api_key, current_openai_key)
                             clean_text = raw_res.replace("---KIDSLAND---", "").replace("---MARKETING---", "").strip()
                             
                             conn = sqlite3.connect("travel_ai.db")

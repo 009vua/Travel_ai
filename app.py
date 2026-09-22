@@ -14,30 +14,21 @@ import io
 import json
 
 # ==========================================
-# 1. QUẢN LÝ CẤU HÌNH BẰNG CONFIG.JSON (Cho 1 người dùng)
+# 1. QUẢN LÝ CẤU HÌNH BẰNG CONFIG.JSON
 # ==========================================
 CONFIG_FILE = "config.json"
 DEFAULT_PROMPT = """BẮT BUỘC TRẢ VỀ THEO ĐÚNG ĐỊNH DẠNG:
 ---KIDSLAND---
-Đóng vai hiệu trưởng trường mầm non có 10 năm kinh nghiệm tuyển sinh.
-Nhiệm vụ:
-1. Quan sát thật kỹ bức ảnh.
-2. Xác định đối tượng chính, hành động, cảm xúc và môi trường xung quanh.
-3. Không mô tả ảnh đơn thuần.
-4. Tìm ra một giá trị giáo dục hoặc bài học cuộc sống ẩn phía sau khoảnh khắc trong ảnh.
-5. Viết bài Facebook từ 2-3 dòng.
-6. Giọng văn chân thành, gần gũi, giàu cảm xúc và mang tính chiêm nghiệm.
-7. Không quảng cáo lộ liễu, không kêu gọi đăng ký.
-8. Mỗi bài phải khai thác một góc nhìn khác nhau.
+Đóng vai hiệu trưởng trường mầm non có 10 năm kinh nghiệm.
+Nhiệm vụ: Dựa vào ảnh và thời gian/địa điểm, tìm ra một giá trị giáo dục hoặc bài học cuộc sống.
+Kỹ thuật: Áp dụng "Đối lập bối cảnh". So sánh quy luật thông thường của thời gian/địa điểm đó với thực tế trong ảnh (Ví dụ: Giờ đón trẻ thường ồn ào nhưng trong ảnh lại bình yên).
+Viết bài Facebook 2-3 dòng, giọng văn tản văn, chiêm nghiệm. Không quảng cáo.
 ---
 ---MARKETING---
 Đóng vai admin fanpage du lịch có 10 năm kinh nghiệm.
-Phân tích bức ảnh dưới góc nhìn du lịch và trải nghiệm.
-Trước tiên hãy xác định: thời tiết, thời điểm trong ngày, mùa trong năm (nếu có thể suy luận).
-Sau đó viết một bài Facebook từ 3-5 dòng.
-Không mô tả ảnh đơn thuần. Hãy kể một cảm xúc, một câu chuyện hoặc một trải nghiệm mà du khách có thể cảm nhận.
-Giọng văn tự nhiên, có tính địa phương, tạo cảm giác muốn khám phá.
-Không quảng cáo lộ liễu. Kết thúc bằng một câu ngắn gợi suy nghĩ."""
+Nhiệm vụ: Phân tích ảnh dưới góc nhìn trải nghiệm. 
+Kỹ thuật: Áp dụng "Đối lập bối cảnh" giữa thời gian thực tế và chi tiết trong ảnh (Ví dụ: 17h00 đáng ra kẹt xe nhưng đường lại vắng sau mưa).
+Viết bài Facebook 3-5 dòng kể một cảm xúc hoặc câu chuyện. Giọng văn tự nhiên, gợi hình, không quảng cáo lộ liễu."""
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -85,7 +76,6 @@ def init_db():
 
 init_db()
 
-# Cài đặt Sidebar (Lưu trực tiếp vào config.json)
 with st.sidebar.expander("⚙️ Cài đặt API Keys", expanded=True):
     new_gemini = st.text_input("Nhập Gemini API Key:", value=st.session_state.gemini_key, type="password")
     new_openai = st.text_input("Nhập ChatGPT API Key:", value=st.session_state.openai_key, type="password")
@@ -142,11 +132,12 @@ def get_decimal_from_dms(dms, ref):
 
 def extract_exif_data(image_path):
     try: image = ImageOps.exif_transpose(Image.open(image_path))
-    except: return "Không rõ", "Không có GPS", False
+    except: return "Không rõ", "Không có GPS", False, False
     
     exif_time = "Không có dữ liệu thời gian"
     location_text = "Không có GPS"
     has_gps = False
+    has_time = False
     
     try:
         exif = image._getexif()
@@ -154,7 +145,9 @@ def extract_exif_data(image_path):
             gps_info = {}
             for key, value in exif.items():
                 decoded = TAGS.get(key, key)
-                if decoded == "DateTimeOriginal": exif_time = value
+                if decoded == "DateTimeOriginal": 
+                    exif_time = value
+                    has_time = True
                 elif decoded == "GPSInfo":
                     for t in value: gps_info[GPSTAGS.get(t, t)] = value[t]
             
@@ -170,7 +163,7 @@ def extract_exif_data(image_path):
                         location_text = f"{address} (📍 {lat:.4f}, {lon:.4f})" if address else f"📍 Tọa độ: {lat:.4f}, {lon:.4f}"
                     except: location_text = f"📍 Tọa độ: {lat:.4f}, {lon:.4f}"
     except: pass
-    return exif_time, location_text, has_gps
+    return exif_time, location_text, has_gps, has_time
 
 def make_aspect_ratio_image(image_path, target_ratio):
     image = ImageOps.exif_transpose(Image.open(image_path))
@@ -191,7 +184,7 @@ def make_aspect_ratio_image(image_path, target_ratio):
 # 4. KHU VỰC TÙY CHỈNH PROMPT & UPLOAD
 # ==========================================
 with st.expander("📝 Tùy chỉnh Master Prompt", expanded=False):
-    new_prompt = st.text_area("Nội dung Master Prompt:", value=st.session_state.custom_prompt, height=400)
+    new_prompt = st.text_area("Nội dung Master Prompt:", value=st.session_state.custom_prompt, height=350)
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("💾 Lưu Prompt"):
@@ -235,11 +228,11 @@ if uploaded_file:
         pending_img_path = os.path.join(UPLOAD_DIR, f"pending_{file_hash}.{file_ext}")
         with open(pending_img_path, "wb") as f: f.write(file_bytes)
         
-        exif_time, loc_text, has_gps = extract_exif_data(pending_img_path)
+        exif_time, loc_text, has_gps, has_time = extract_exif_data(pending_img_path)
         st.session_state.pending_post = {
             "id": file_hash, "img_path": pending_img_path,
             "exif_time": exif_time, "loc_text": loc_text, 
-            "has_gps": has_gps, "ext": file_ext
+            "has_gps": has_gps, "has_time": has_time, "ext": file_ext
         }
         st.session_state.active_post_id = None
 
@@ -250,18 +243,29 @@ if st.session_state.pending_post:
     
     with col_img:
         st.image(p["img_path"], caption="Ảnh đang chờ xử lý", use_container_width=True)
-        st.info(f"📅 **Thời gian:** {p['exif_time']}\n\n📍 **Địa điểm gốc:** {p['loc_text']}")
+        st.info(f"📅 **Thời gian gốc:** {p['exif_time']}\n\n📍 **Địa điểm gốc:** {p['loc_text']}")
         
     with col_content:
-        st.warning("⚠️ Cấu hình dữ liệu địa điểm trước khi phân tích:")
+        st.warning("⚠️ Cấu hình dữ liệu trước khi phân tích:")
         
+        # 1. KHỐI XỬ LÝ THỜI GIAN
+        manual_time = ""
+        if p["has_time"]:
+            st.success(f"✅ Ảnh CÓ sẵn dữ liệu Thời gian.")
+            final_time_text = p['exif_time']
+        else:
+            st.error("❌ Ảnh KHÔNG CÓ dữ liệu Thời gian.")
+            manual_time = st.text_input("✍️ Nhập thời gian chụp (Giúp AI hiểu rõ bối cảnh hơn):", placeholder="VD: 17h00 chiều thứ Sáu, hoặc Sáng sớm 28/4/2026")
+            final_time_text = manual_time if manual_time.strip() else "Không rõ thời gian"
+
+        # 2. KHỐI XỬ LÝ ĐỊA ĐIỂM
         manual_loc = ""
         if p["has_gps"]:
-            st.success("✅ Ảnh CÓ sẵn dữ liệu GPS. AI sẽ ưu tiên sử dụng tọa độ thực tế này.")
+            st.success("✅ Ảnh CÓ sẵn dữ liệu GPS.")
             final_loc_text = p['loc_text']
         else:
-            st.error("❌ Ảnh KHÔNG CÓ dữ liệu GPS. Vui lòng nhập tay địa điểm bên dưới.")
-            manual_loc = st.text_input("✍️ Nhập địa điểm của bức ảnh (Bắt buộc để AI không đoán mò):", placeholder="VD: Nha Trang, Trường Kidsland...")
+            st.error("❌ Ảnh KHÔNG CÓ dữ liệu GPS.")
+            manual_loc = st.text_input("✍️ Nhập địa điểm của bức ảnh (Bắt buộc để AI không đoán mò):", placeholder="VD: Bãi tắm Hòn Chồng Nha Trang, Trường Kidsland...")
             final_loc_text = manual_loc if manual_loc.strip() else "Không rõ"
             
         selected_ai = st.radio("🤖 Chọn AI:", ["Google Gemini", "ChatGPT (OpenAI)"], horizontal=True)
@@ -269,16 +273,22 @@ if st.session_state.pending_post:
         if st.button("🚀 Bấm để AI phân tích", type="primary", use_container_width=True):
             with st.spinner("Đang xử lý..."):
                 try:
-                    # Logic kiểm soát địa điểm gắt gao gửi cho AI
+                    # Truyền chỉ thị Thời Gian cho AI
+                    if p["has_time"]:
+                        time_instruction = f"Thời gian (Trích xuất chính xác từ EXIF): {p['exif_time']}."
+                    else:
+                        time_instruction = f"Thời gian (Do người dùng cung cấp): {manual_time}. Nếu trống, hãy bỏ qua yếu tố thời gian." if manual_time.strip() else "Thời gian: Không xác định."
+
+                    # Truyền chỉ thị Địa Điểm cho AI
                     if p["has_gps"]:
-                        loc_instruction = f"Địa điểm (Trích xuất chính xác từ GPS máy ảnh): {p['loc_text']}."
+                        loc_instruction = f"Địa điểm (Trích xuất chính xác từ GPS): {p['loc_text']}."
                     else:
                         if manual_loc.strip():
-                            loc_instruction = f"Địa điểm (Do người dùng cung cấp chính xác): {manual_loc}. Yêu cầu AI: Tuyệt đối sử dụng địa điểm này, KHÔNG ĐƯỢC TỰ SUY ĐOÁN hay bịa ra địa điểm khác dựa vào chi tiết ảnh."
+                            loc_instruction = f"Địa điểm (Do người dùng cung cấp): {manual_loc}. Yêu cầu AI: Tuyệt đối sử dụng địa điểm này, KHÔNG SUY ĐOÁN địa điểm khác."
                         else:
-                            loc_instruction = "Không có thông tin địa điểm (Không có GPS và không được nhập tay). Yêu cầu AI: Bỏ qua yếu tố địa lý, tuyệt đối KHÔNG ĐƯỢC ĐOÁN MÒ địa điểm, chỉ tập trung phân tích nội dung/hành động trong ảnh."
+                            loc_instruction = "Không có thông tin địa điểm. Yêu cầu AI: Bỏ qua yếu tố địa lý, KHÔNG ĐƯỢC ĐOÁN MÒ địa điểm."
 
-                    final_prompt = f"Thông tin phụ trợ:\n- Thời gian chụp: {p['exif_time']}\n- {loc_instruction}\n\n{active_prompt}"
+                    final_prompt = f"Thông tin phụ trợ đầu vào:\n- {time_instruction}\n- {loc_instruction}\n\n{active_prompt}"
                     
                     raw_res = analyze_image_with_ai(selected_ai, final_prompt, p["img_path"])
                     
@@ -291,10 +301,10 @@ if st.session_state.pending_post:
                     final_img_path = os.path.join(UPLOAD_DIR, f"{p['id']}.{p['ext']}")
                     if os.path.exists(p["img_path"]): shutil.move(p["img_path"], final_img_path)
                     
-                    # Lưu vào DB với địa điểm cuối cùng (GPS hoặc Nhập tay)
+                    # Lưu vào DB với Thời gian và Địa điểm cuối cùng (EXIF hoặc Nhập tay)
                     conn = sqlite3.connect("travel_ai.db")
                     conn.execute("INSERT OR IGNORE INTO posts VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                                 (p["id"], final_img_path, p["exif_time"], final_loc_text, 
+                                 (p["id"], final_img_path, final_time_text, final_loc_text, 
                                   c_kids, c_mkt, datetime.datetime.now()))
                     conn.commit()
                     conn.close()
@@ -313,7 +323,7 @@ elif st.session_state.active_post_id:
         col_img, col_content = st.columns([1, 1.2])
         with col_img:
             st.image(p_img, use_container_width=True)
-            st.info(f"📅 **Thời gian:** {p_time}\n\n📍 **Địa điểm lưu trữ:** {p_loc}")
+            st.info(f"📅 **Thời gian:** {p_time}\n\n📍 **Địa điểm:** {p_loc}")
             st.write("---")
             c1, c2 = st.columns(2)
             with c1: st.image(make_aspect_ratio_image(p_img, "4:5"), caption="Tỷ lệ 4:5")
@@ -327,7 +337,7 @@ elif st.session_state.active_post_id:
                 st.text_area("Nội dung Marketing:", value=p_mkt, height=250)
 
 # ==========================================
-# 5. THƯ VIỆN LƯU TRỮ (Dưới cùng)
+# 5. THƯ VIỆN LƯU TRỮ
 # ==========================================
 st.divider()
 st.subheader("📚 Thư viện đã xử lý")
